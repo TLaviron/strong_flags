@@ -20,38 +20,70 @@ public:
     constexpr impl() noexcept : m_value { } {
     }
 
-    constexpr impl(const FlagType& rhs) noexcept : m_value { static_cast<const this_type&>(rhs).m_value } {
-    }
-
     static constexpr FlagType from_underlying_type(underlying_type value) noexcept {
         FlagType res;
         static_cast<this_type&>(res).m_value = value & s_mask;
         return res;
     }
 
+    constexpr underlying_type to_underlying_type() const noexcept {
+        return m_value;
+    }
+
+    constexpr explicit operator underlying_type() const noexcept {
+        return m_value;
+    }
+
     static constexpr FlagType from_bit(bit_type bit) noexcept {
         return from_underlying_type(s_one << bit);
     }
 
-    constexpr bool operator==(const FlagType& rhs) noexcept {
+    constexpr bool operator==(const FlagType& rhs) const noexcept {
         return m_value == static_cast<const this_type&>(rhs).m_value;
     }
 
-    constexpr bool operator!=(const FlagType& rhs) noexcept {
+    constexpr bool operator!=(const FlagType& rhs) const noexcept {
         return m_value != static_cast<const this_type&>(rhs).m_value;
     }
 
-    constexpr bool test(bit_type bit) noexcept {
-        return ((1 << bit) & m_value) != 0;
+    constexpr bool test(bit_type bit) const noexcept {
+        return ((s_one << bit) & m_value) != 0;
     }
 
-    constexpr bool test_any(const FlagType& rhs) noexcept {
+    constexpr bool test_any(const FlagType& rhs) const noexcept {
         return (m_value & static_cast<const this_type&>(rhs).m_value) != 0;
     }
 
-    constexpr bool test_all(const FlagType& rhs) noexcept {
+    constexpr bool test_all(const FlagType& rhs) const noexcept {
         const auto& other = static_cast<const this_type&>(rhs);
         return (m_value & other.m_value) == other.m_value;
+    }
+
+    FlagType& set(bit_type bit) noexcept {
+        m_value |= (s_one << bit) & s_mask;
+        return *static_cast<FlagType*>(this);
+    }
+
+    FlagType& set(const FlagType& rhs) noexcept {
+        return *this |= rhs;
+    }
+
+    FlagType& clear(bit_type bit) noexcept {
+        m_value &= ~(s_one << bit);
+        return *static_cast<FlagType*>(this);
+    }
+
+    FlagType& clear(const FlagType& rhs) noexcept {
+        return *this &= (~rhs);
+    }
+
+    FlagType& toggle(bit_type bit) noexcept {
+        m_value = s_mask & (m_value ^ (s_one << bit));
+        return *static_cast<FlagType*>(this);
+    }
+
+    FlagType& toggle(const FlagType& rhs) noexcept {
+        return *this ^= rhs;
     }
 
     FlagType& operator|=(const FlagType& rhs) noexcept {
@@ -69,7 +101,19 @@ public:
         return *static_cast<FlagType*>(this);
     }
 
-    constexpr FlagType operator~() noexcept {
+    constexpr FlagType operator|(const FlagType& rhs) const noexcept {
+        return from_underlying_type(m_value | static_cast<const this_type&>(rhs).m_value);
+    }
+
+    constexpr FlagType operator&(const FlagType& rhs) const noexcept {
+        return from_underlying_type(m_value & static_cast<const this_type&>(rhs).m_value);
+    }
+
+    constexpr FlagType operator^(const FlagType& rhs) const noexcept {
+        return from_underlying_type(m_value ^ static_cast<const this_type&>(rhs).m_value);
+    }
+
+    constexpr FlagType operator~() const noexcept {
         return from_underlying_type((~m_value) & s_mask);
     }
 
@@ -86,24 +130,6 @@ private:
             "Underlying type must be integer type or bitset type");
     static_assert(s_bitsize >= N, "Integer type too small");
 };
-
-template<typename FlagType, typename Integer, std::size_t N>
-constexpr FlagType operator|(const impl<FlagType, Integer, N>& lhs, const impl<FlagType, Integer, N>& rhs) noexcept {
-    impl<FlagType, Integer, N> res(lhs);
-    return res |= rhs;
-}
-
-template<typename FlagType, typename Integer, std::size_t N>
-constexpr FlagType operator&(const impl<FlagType, Integer, N>& lhs, const impl<FlagType, Integer, N>& rhs) noexcept {
-    impl<FlagType, Integer, N> res(lhs);
-    return res &= rhs;
-}
-
-template<typename FlagType, typename Integer, std::size_t N>
-constexpr FlagType operator^(const impl<FlagType, Integer, N>& lhs, const impl<FlagType, Integer, N>& rhs) noexcept {
-    impl<FlagType, Integer, N> res(lhs);
-    return res ^= rhs;
-}
 
 template<typename FlagType, template<std::size_t> typename Bitset, std::size_t N>
 class impl<FlagType, Bitset<N>, N> {
@@ -327,12 +353,20 @@ private:
         using base_type::base_type;                                                                         \
     }
 
-#define STRONG_FLAGS_DEFINE_FLAGS(name, underlying_type, ...)                                                \
+#define STRONG_FLAGS_DEFINE_FACTORY_FUNCTIONS                                                               \
+    inline constexpr type from_bit(type::bit_type bit) { return type::from_bit(bit); }                      \
+    inline constexpr type from_underlying_type(type::underlying_type value) {                               \
+        return type::from_underlying_type(value);                                                           \
+    }
+
+#define STRONG_FLAGS_DEFINE_FLAGS(name, underlying_type, ...)                                               \
 namespace name{                                                                                             \
-    STRONG_FLAGS_DEFINE_CLASS(underlying_type, STRONG_FLAGS_ARG_COUNT(__VA_ARGS__));\
-\
-    STRONG_FLAGS_MAKE_FLAGS(STRONG_FLAGS_ARG_COUNT(__VA_ARGS__), __VA_ARGS__);\
-}\
+    STRONG_FLAGS_DEFINE_CLASS(underlying_type, STRONG_FLAGS_ARG_COUNT(__VA_ARGS__));                        \
+                                                                                                            \
+    STRONG_FLAGS_MAKE_FLAGS(STRONG_FLAGS_ARG_COUNT(__VA_ARGS__), __VA_ARGS__);                              \
+                                                                                                            \
+    STRONG_FLAGS_DEFINE_FACTORY_FUNCTIONS                                                                   \
+}
 
 
 #endif /* INCLUDE_STRONG_FLAGS_H_ */
