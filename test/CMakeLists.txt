@@ -15,7 +15,7 @@ if (STRONG_FLAGS_BUILD_TESTS)
 	add_dependencies(catch catch_external)
 	target_include_directories(catch INTERFACE ${CMAKE_BINARY_DIR}/external/catch/src/catch_external/single_include/)
 	
-	set(TEST_SOURCES test_main.cpp)
+	set(TEST_SOURCES test_main.cpp unsigned_test.cpp)
 	
 	add_executable(strong_flags_test ${TEST_SOURCES})
 	target_link_libraries(strong_flags_test PRIVATE catch strong_flags)
